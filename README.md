@@ -1,2 +1,2 @@
 # ATTT
-Dự án kết cấu hình camera Dahua với đầu ghi POE
+Đây là dự án kết nối camera Dahua có đầu ghi POE đến một máy chủ
