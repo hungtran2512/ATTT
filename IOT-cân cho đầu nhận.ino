@@ -1,72 +1,53 @@
-#include <SoftwareSerial.h>
+#include <LoRa.h>
+#include <SPI.h>
 #include <SD.h>
 
-SoftwareSerial mySerial(2, 3); // RX nối với TX (lora), TX - RX (lora)
-#define SCALE_RX 10 // Chân RX nối với cân
-#define SCALE_TX 11 // Chân TX nối với cân
-#define SD_CS 4 // Chân CS của module thẻ nhớ SD
+// Cấu hình chân cho mô-đun thẻ SD
+const int chipSelect = 4;  // Chân kết nối với CS của mô-đun thẻ SD
 
-SoftwareSerial scaleSerial(SCALE_RX, SCALE_TX); // Giao tiếp với cân
+void setup() {
+  Serial.begin(9600);  // Khởi động Serial Monitor
 
-File logFile;
-
-void setup()
-{
-  Serial.begin(9600); // Khởi tạo giao tiếp với máy tính
-  mySerial.begin(9600); // Khởi tạo giao tiếp với module LoRa
-  scaleSerial.begin(9600); // Khởi tạo giao tiếp với cân
-
-  // Khởi tạo thẻ nhớ SD
-  if (!SD.begin(SD_CS)) {
-    Serial.println("Lỗi khởi tạo thẻ SD!");
-    return;
+  // Khởi động thẻ SD
+  if (!SD.begin(chipSelect)) {
+    Serial.println("Khởi động thẻ SD thất bại!");
+    while (1);  // Dừng chương trình nếu khởi động thẻ SD thất bại
   }
-  
-  // Mở file log
-  logFile = SD.open("log.txt", FILE_WRITE);
-  if (!logFile) {
-    Serial.println("Không thể mở file log!");
-    return;
+  Serial.println("Khởi động thẻ SD thành công!");
+
+  // Khởi động LoRa
+  if (!LoRa.begin(433E6)) {  // Cài đặt tần số là 433 MHz
+    Serial.println("Khởi động LoRa thất bại!");
+    while (1);  // Dừng chương trình nếu khởi động LoRa thất bại
   }
+  Serial.println("Khởi động LoRa thành công!");
 }
 
-void loop()
-{
-  /*
-    Đọc dữ liệu từ cân
-    Gửi dữ liệu đi bằng UART LoRa
-  */
-  if (scaleSerial.available() > 0)
-  {
-    String inputWeight = "";
-    inputWeight = scaleSerial.readStringUntil('\n'); // Đọc dữ liệu từ cân cho đến khi gặp ký tự xuống dòng
-    if (inputWeight != "")
-    {
-      inputWeight.trim(); // Loại bỏ khoảng trắng đầu và cuối
-      Serial.println(inputWeight); // In dữ liệu ra màn hình Serial Monitor
-      mySerial.println(inputWeight); // Gửi dữ liệu qua module LoRa
+void loop() {
+  // Thử phân tích gói dữ liệu từ LoRa
+  int packetSize = LoRa.parsePacket();
+  if (packetSize) {
+    // Đọc gói dữ liệu
+    String receivedData = "";
+    while (LoRa.available()) {
+      receivedData += (char)LoRa.read();
+    }
+    Serial.print("Nhận được dữ liệu: ");
+    Serial.println(receivedData);
 
-      // Ghi dữ liệu vào file log
-      if (logFile) {
-        logFile.println(inputWeight);
-        logFile.flush(); // Đảm bảo dữ liệu được ghi ngay lập tức
-      }
+    // Chuyển đổi dữ liệu nhận được sang kiểu số nguyên (giả sử là giá trị số cân)
+    long weight = receivedData.toInt();
+    
+    // Mở file để ghi dữ liệu
+    File dataFile = SD.open("weightData.txt", FILE_WRITE);
+    if (dataFile) {
+      dataFile.println(weight);  // Ghi trọng lượng vào file
+      dataFile.close();  // Đóng file để lưu dữ liệu
+      Serial.println("Đã ghi dữ liệu vào file weightData.txt.");
+    } else {
+      Serial.println("Không thể mở file để ghi dữ liệu.");
     }
   }
 
-  /*
-    Nhận dữ liệu từ LoRa (UART: RX, TX)
-    In ra màn hình Serial
-  */
-  if (mySerial.available() > 0)
-  {
-    String inputReceive = mySerial.readStringUntil('\n'); // Đọc dữ liệu từ LoRa
-
-    if (inputReceive != "")
-    {
-      inputReceive.trim(); // Loại bỏ khoảng trắng đầu và cuối
-      Serial.println(inputReceive); // In dữ liệu ra màn hình Serial Monitor
-    }
-  }
-  delay(20); // Đợi 20 mili giây
+  delay(1000);  // Dừng 1 giây trước khi thực hiện lại vòng lặp
 }
