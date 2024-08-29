@@ -1,50 +1,45 @@
-#include <SoftwareSerial.h>
+#include <LoRa.h>
+#include <HX711.h>
 
-SoftwareSerial mySerial(2, 3); // RX nối với TX (lora), TX - RX (lora)
+// Pin kết nối với HX711
+const int LOADCELL_DOUT_PIN = 2;
+const int LOADCELL_SCK_PIN = 3;
 
-#define SCALE_RX 10 // Chân RX nối với cân (nếu cân sử dụng một chân khác)
-#define SCALE_TX 11 // Chân TX nối với cân (nếu cân sử dụng một chân khác)
+// Khởi tạo đối tượng HX711
+HX711 scale;
 
-SoftwareSerial scaleSerial(SCALE_RX, SCALE_TX); // Giao tiếp với cân
+// Địa chỉ LoRa
+const int loraAddress = 1;
 
-void setup()
-{
-  Serial.begin(9600); // Khởi tạo giao tiếp với máy tính
-  mySerial.begin(9600); // Khởi tạo giao tiếp với module LoRa
-  scaleSerial.begin(9600); // Khởi tạo giao tiếp với cân
+void setup() {
+  Serial.begin(9600);  // Khởi động Serial Monitor
+  
+  // Khởi động HX711
+  scale.begin(LOADCELL_DOUT_PIN, LOADCELL_SCK_PIN);
+  
+  // Khởi động LoRa
+  if (!LoRa.begin(433E6)) {  // Chọn tần số LoRa là 433 MHz
+    Serial.println("Khởi động LoRa thất bại!");
+    while (1);
+  }
+  Serial.println("Khởi động LoRa thành công!");
 }
 
-void loop()
-{
-/*
-    Đọc dữ liệu từ cân
-    Gửi dữ liệu đi bằng UART LoRa
-  */
-    if (scaleSerial.available() > 0)
-    {
-    String inputWeight = "";
-    inputWeight = scaleSerial.readStringUntil('\n'); // Đọc dữ liệu từ cân cho đến khi gặp ký tự xuống dòng
-    if (inputWeight != "")
-    {
-      inputWeight.trim(); // Loại bỏ khoảng trắng đầu và cuối
-      Serial.println(inputWeight); // In dữ liệu ra màn hình Serial Monitor
-      mySerial.println(inputWeight); // Gửi dữ liệu qua module LoRa
-    }
-    }
+void loop() {
+  if (scale.is_ready()) {
+    long weight = scale.read(); // Đọc giá trị từ Load Cell
+    Serial.print("Trọng lượng: ");
+    Serial.println(weight);
 
-    /*
-    Nhận dữ liệu từ LoRa (UART: RX, TX)
-    In ra màn hình Serial
-  */
-    if (mySerial.available() > 0)
-    {
-    String inputReceive = mySerial.readStringUntil('\n'); // Đọc dữ liệu từ LoRa
+    // Chuẩn bị truyền dữ liệu qua LoRa
+    LoRa.beginPacket();
+    LoRa.print(weight);
+    LoRa.endPacket();
 
-    if (inputReceive != "")
-    {
-      inputReceive.trim(); // Loại bỏ khoảng trắng đầu và cuối
-      Serial.println(inputReceive); // In dữ liệu ra màn hình Serial Monitor
-    }
-    }
-  delay(20); // Đợi 20 mili giây
+    Serial.println("Đã truyền dữ liệu qua LoRa.");
+  } else {
+    Serial.println("HX711 chưa sẵn sàng.");
+  }
+
+  delay(1000); // Dừng 1 giây trước khi đo và truyền lại
 }
