@@ -1,0 +1,47 @@
+#include <Wire.h>
+#include <qrcode.h>
+
+// Thông tin cá nhân
+const char* hoVaTen = "Nguyen Van A";
+const char* canCuoc = "0123456789";
+const char* diaChi = "123 Nguyen Trai, Ha Noi";
+const char* soDienThoai = "0987654321";
+
+// Kích thước tối đa của mã QR
+QRCode qrcode;
+uint8_t qrcodeData[qrcode_getBufferSize(3)];
+
+void setup() {
+  // Khởi động Serial
+  Serial.begin(9600);
+  
+  // Tạo nội dung cho mã QR
+  String content = String("Ho va Ten: ") + hoVaTen + "\n" +
+                   "CCCD: " + canCuoc + "\n" +
+                   "Dia chi: " + diaChi + "\n" +
+                   "SDT: " + soDienThoai;
+  
+  // Khởi tạo mã QR
+  qrcode_initText(&qrcode, qrcodeData, 3, 0, content.c_str());
+
+  // Xuất mã QR qua cổng Serial
+  printQRCode(&qrcode);
+}
+
+void loop() {
+  // Không cần làm gì trong loop
+}
+
+void printQRCode(QRCode *qrcode) {
+  for (uint8_t y = 0; y < qrcode->size; y++) {
+    for (uint8_t x = 0; x < qrcode->size; x++) {
+      if (qrcode_getModule(qrcode, x, y)) {
+        Serial.print("##");
+      } else {
+        Serial.print("  ");
+      }
+    }
+    Serial.println();
+  }
+  Serial.println();
+}
